@@ -1,1 +1,406 @@
-Teste
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskFlow - Gestor de Tarefas e Anotações</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f5f3ff',
+                            100: '#ede9fe',
+                            500: '#8b5cf6',
+                            600: '#7c3aed',
+                            700: '#6d28d9',
+                            800: '#5b21b6',
+                            900: '#4c1d95',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Canvas Confetti JS -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(139, 92, 246, 0.4);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(139, 92, 246, 0.7);
+        }
+
+        /* Glassmorphism effects */
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        
+        .light .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+        }
+
+        /* Custom Task Animations */
+        .task-item {
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .task-item:hover {
+            transform: translateY(-2px);
+        }
+
+        .task-enter {
+            animation: slideIn 0.3s ease forwards;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen transition-colors duration-300 antialiased pb-12">
+
+    <!-- Toast Notifications Container -->
+    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none"></div>
+
+    <!-- Main Container -->
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10">
+
+        <!-- Header Bar -->
+        <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-brand-500/20 text-white">
+                    <i class="fa-solid font-bold text-2xl fa-check-double"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-white via-slate-200 to-brand-300 bg-clip-text text-transparent">
+                        TaskFlow
+                    </h1>
+                    <p class="text-xs sm:text-sm text-slate-400">Organize suas atividades e prioridades</p>
+                </div>
+            </div>
+
+            <!-- Controls: Theme Toggle & Options -->
+            <div class="flex items-center gap-3 self-end md:self-auto">
+                <button id="theme-toggle-btn" class="p-2.5 rounded-xl glass-panel text-slate-300 hover:text-white hover:bg-slate-800 transition-all flex items-center gap-2 text-sm font-medium">
+                    <i id="theme-icon" class="fa-solid fa-moon text-brand-400"></i>
+                    <span id="theme-text" class="hidden sm:inline">Tema Escuro</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Statistics Dashboard -->
+        <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+            <!-- Total -->
+            <div class="glass-panel p-4 rounded-2xl flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total</p>
+                    <h3 id="stat-total" class="text-2xl sm:text-3xl font-bold text-white mt-1">0</h3>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-slate-800/80 border border-slate-700/50 flex items-center justify-center text-slate-300">
+                    <i class="fa-solid fa-list-check"></i>
+                </div>
+            </div>
+
+            <!-- Pendentes -->
+            <div class="glass-panel p-4 rounded-2xl flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-amber-400/90">Pendentes</p>
+                    <h3 id="stat-pending" class="text-2xl sm:text-3xl font-bold text-amber-300 mt-1">0</h3>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                    <i class="fa-regular fa-clock"></i>
+                </div>
+            </div>
+
+            <!-- Concluídas -->
+            <div class="glass-panel p-4 rounded-2xl flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-emerald-400/90">Concluídas</p>
+                    <h3 id="stat-completed" class="text-2xl sm:text-3xl font-bold text-emerald-300 mt-1">0</h3>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                    <i class="fa-solid fa-check"></i>
+                </div>
+            </div>
+
+            <!-- Atrasadas -->
+            <div class="glass-panel p-4 rounded-2xl flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-rose-400/90">Atrasadas</p>
+                    <h3 id="stat-overdue" class="text-2xl sm:text-3xl font-bold text-rose-300 mt-1">0</h3>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- Progress Bar Card -->
+        <div class="glass-panel p-4 rounded-2xl mb-8">
+            <div class="flex items-center justify-between text-xs sm:text-sm font-medium mb-2">
+                <span class="text-slate-300 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-line text-brand-400"></i> Progresso de Conclusão
+                </span>
+                <span id="progress-text" class="text-brand-300 font-bold">0%</span>
+            </div>
+            <div class="w-full bg-slate-800/80 rounded-full h-3 overflow-hidden p-0.5 border border-slate-700/50">
+                <div id="progress-bar-fill" class="bg-gradient-to-r from-brand-600 to-emerald-400 h-full rounded-full transition-all duration-500 ease-out w-0"></div>
+            </div>
+        </div>
+
+        <!-- Expandable Task Input Bar -->
+        <section class="glass-panel rounded-2xl p-4 sm:p-5 mb-8 shadow-xl shadow-slate-950/50 border border-brand-500/20">
+            <form id="task-form" class="space-y-4">
+                <!-- Search/Input Bar Main Row -->
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <div class="relative flex-1">
+                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                            <i class="fa-solid fa-pen-to-square text-brand-400"></i>
+                        </div>
+                        <input type="text" id="task-title-input" required
+                            placeholder="O que precisa ser feito? Digite sua tarefa ou anotação..." 
+                            class="w-full pl-11 pr-4 py-3.5 bg-slate-900/90 border border-slate-700/80 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 rounded-xl text-slate-100 placeholder-slate-400 text-sm sm:text-base outline-none transition-all">
+                    </div>
+                    
+                    <button type="submit" 
+                        class="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-semibold rounded-xl shadow-lg shadow-brand-600/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 min-w-[140px]">
+                        <i class="fa-solid fa-plus text-base"></i>
+                        <span>Adicionar</span>
+                    </button>
+                </div>
+
+                <!-- Input Options Row (Priority & Due Date) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-3 pt-2 border-t border-slate-800/80">
+                    <!-- Priority Selector -->
+                    <div class="md:col-span-7 flex flex-col gap-1.5">
+                        <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <i class="fa-solid fa-flag text-xs"></i> Prioridade
+                        </label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="priority-option" value="important" class="peer hidden">
+                                <div class="px-3 py-2 text-center rounded-xl border border-slate-800 bg-slate-900/60 peer-checked:bg-rose-500/20 peer-checked:border-rose-500/60 peer-checked:text-rose-300 text-slate-400 text-xs font-semibold hover:border-slate-700 transition-all flex items-center justify-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                                    <span>Importante</span>
+                                </div>
+                            </label>
+                            
+                            <label class="cursor-pointer">
+                                <input type="radio" name="priority-option" value="medium" checked class="peer hidden">
+                                <div class="px-3 py-2 text-center rounded-xl border border-slate-800 bg-slate-900/60 peer-checked:bg-amber-500/20 peer-checked:border-amber-500/60 peer-checked:text-amber-300 text-slate-400 text-xs font-semibold hover:border-slate-700 transition-all flex items-center justify-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                                    <span>Normal</span>
+                                </div>
+                            </label>
+
+                            <label class="cursor-pointer">
+                                <input type="radio" name="priority-option" value="optional" class="peer hidden">
+                                <div class="px-3 py-2 text-center rounded-xl border border-slate-800 bg-slate-900/60 peer-checked:bg-emerald-500/20 peer-checked:border-emerald-500/60 peer-checked:text-emerald-300 text-slate-400 text-xs font-semibold hover:border-slate-700 transition-all flex items-center justify-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                    <span>Opcional</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Due Date Input -->
+                    <div class="md:col-span-5 flex flex-col gap-1.5">
+                        <label for="task-due-date" class="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <i class="fa-regular fa-calendar-days text-xs"></i> Data de Entrega
+                        </label>
+                        <div class="relative">
+                            <input type="datetime-local" id="task-due-date" 
+                                class="w-full px-3 py-2 bg-slate-900/90 border border-slate-700/80 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 rounded-xl text-slate-200 text-xs sm:text-sm outline-none transition-all">
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </section>
+
+        <!-- Search & Control Toolbar -->
+        <section class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 mb-6">
+            <!-- Search Bar -->
+            <div class="relative flex-1 max-w-md">
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <i class="fa-solid fa-magnifying-glass text-sm"></i>
+                </div>
+                <input type="text" id="search-input" 
+                    placeholder="Pesquisar tarefas..." 
+                    class="w-full pl-10 pr-9 py-2.5 bg-slate-900/80 border border-slate-800 focus:border-slate-700 rounded-xl text-slate-200 text-sm placeholder-slate-500 outline-none transition-all">
+                <button id="clear-search-btn" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-300">
+                    <i class="fa-solid fa-xmark text-xs"></i>
+                </button>
+            </div>
+
+            <!-- Sorting & Bulk Action -->
+            <div class="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
+                <!-- Sort Selector -->
+                <div class="relative min-w-[150px]">
+                    <select id="sort-select" class="w-full appearance-none px-3 py-2.5 pr-8 bg-slate-900/80 border border-slate-800 rounded-xl text-slate-300 text-xs sm:text-sm outline-none cursor-pointer focus:border-brand-500">
+                        <option value="created-desc">Mais recentes</option>
+                        <option value="created-asc">Mais antigas</option>
+                        <option value="due-date">Data de Entrega</option>
+                        <option value="priority">Prioridade</option>
+                    </select>
+                    <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-slate-500">
+                        <i class="fa-solid fa-chevron-down text-xs"></i>
+                    </div>
+                </div>
+
+                <!-- Clear Completed Button -->
+                <button id="clear-completed-btn" 
+                    title="Limpar concluídas"
+                    class="px-3 py-2.5 bg-slate-900/80 hover:bg-rose-500/10 border border-slate-800 hover:border-rose-500/30 text-slate-400 hover:text-rose-400 rounded-xl text-xs sm:text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-trash-can text-xs"></i>
+                    <span class="hidden sm:inline">Limpar Concluídas</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Category / Filter Tabs -->
+        <nav class="flex items-center gap-2 overflow-x-auto pb-3 mb-6 no-scrollbar border-b border-slate-800/80">
+            <button class="filter-tab px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap bg-brand-600 text-white shadow-md shadow-brand-600/20" data-filter="all">
+                Todas
+            </button>
+            <button class="filter-tab px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap bg-slate-900/80 text-slate-400 hover:text-slate-200 hover:bg-slate-800" data-filter="important">
+                <i class="fa-solid fa-circle text-[8px] text-rose-500 mr-1.5"></i>Importantes
+            </button>
+            <button class="filter-tab px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap bg-slate-900/80 text-slate-400 hover:text-slate-200 hover:bg-slate-800" data-filter="medium">
+                <i class="fa-solid fa-circle text-[8px] text-amber-500 mr-1.5"></i>Normais
+            </button>
+            <button class="filter-tab px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap bg-slate-900/80 text-slate-400 hover:text-slate-200 hover:bg-slate-800" data-filter="optional">
+                <i class="fa-solid fa-circle text-[8px] text-emerald-500 mr-1.5"></i>Opcionais
+            </button>
+            <button class="filter-tab px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap bg-slate-900/80 text-slate-400 hover:text-slate-200 hover:bg-slate-800" data-filter="pending">
+                Pendentes
+            </button>
+            <button class="filter-tab px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap bg-slate-900/80 text-slate-400 hover:text-slate-200 hover:bg-slate-800" data-filter="completed">
+                Concluídas
+            </button>
+        </nav>
+
+        <!-- Task List Container -->
+        <main id="tasks-list" class="space-y-3 min-h-[200px]">
+            <!-- Task items will be inserted dynamically via JavaScript -->
+        </main>
+
+        <!-- Empty State UI -->
+        <div id="empty-state" class="hidden flex-col items-center justify-center py-16 text-center glass-panel rounded-2xl border-dashed border-slate-800">
+            <div class="w-16 h-16 rounded-2xl bg-slate-800/50 flex items-center justify-center text-slate-500 text-2xl mb-4">
+                <i class="fa-regular fa-clipboard"></i>
+            </div>
+            <h3 class="text-base font-semibold text-slate-300">Nenhuma tarefa encontrada</h3>
+            <p class="text-xs sm:text-sm text-slate-500 max-w-sm mt-1">Crie uma nova atividade na barra superior ou mude os filtros aplicados.</p>
+        </div>
+
+    </div>
+
+    <!-- Edit Task Modal Dialog -->
+    <div id="edit-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden opacity-0 transition-opacity duration-200">
+        <div class="glass-panel w-full max-w-lg rounded-2xl p-6 shadow-2xl border border-slate-800 transform scale-95 transition-transform duration-200" id="edit-modal-content">
+            <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+                <h3 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+                    <i class="fa-solid fa-pen-to-square text-brand-400"></i> Editar Tarefa
+                </h3>
+                <button id="close-edit-modal-btn" class="text-slate-400 hover:text-slate-200 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form id="edit-task-form" class="space-y-4">
+                <input type="hidden" id="edit-task-id">
+                
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Título / Descrição</label>
+                    <input type="text" id="edit-task-title" required 
+                        class="w-full px-4 py-3 bg-slate-900 border border-slate-700 focus:border-brand-500 rounded-xl text-slate-100 text-sm outline-none">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Prioridade</label>
+                        <select id="edit-task-priority" class="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-sm outline-none">
+                            <option value="important">Importante</option>
+                            <option value="medium">Normal</option>
+                            <option value="optional">Opcional</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Data de Entrega</label>
+                        <input type="datetime-local" id="edit-task-due-date" 
+                            class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-xs sm:text-sm outline-none">
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                    <button type="button" id="cancel-edit-btn" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl text-sm transition-all">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-medium rounded-xl text-sm transition-all shadow-lg shadow-brand-600/30">
+                        Salvar Alterações
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal Dialog -->
+    <div id="confirm-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden opacity-0 transition-opacity duration-200">
+        <div class="glass-panel w-full max-w-md rounded-2xl p-6 shadow-2xl border border-slate-800 text-center">
+            <div class="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto mb-4 text-xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 id="confirm-modal-title" class="text-lg font-bold text-slate-100 mb-2">Tem certeza?</h3>
+            <p id="confirm-modal-desc" class="text-sm text-slate-400 mb-6">Esta ação não poderá ser desfeita.</p>
+            
+            <div class="flex items-center justify-center gap-3">
+                <button id="cancel-confirm-btn" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl text-sm transition-all w-1/2">
+                    Cancelar
+                </button>
+                <button id="action-confirm-btn" class="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-medium rounded-xl text-sm transition-all shadow-lg shadow-rose-600/30 w-1/2">
+                    Confirmar
+                </button>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+  </body>
+</html>
